@@ -1,3 +1,5 @@
+build/
+Debug/
 MPC.build/
 MPC.xcodeproj/
 .vscode
