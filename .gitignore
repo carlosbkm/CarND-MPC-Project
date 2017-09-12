@@ -1,3 +1,5 @@
+MPC.build/
+MPC.xcodeproj/
 .vscode
 build
 tags
