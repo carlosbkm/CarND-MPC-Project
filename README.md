@@ -1,6 +1,66 @@
 # CarND-Controls-MPC
 Self-Driving Car Engineer Nanodegree Program
 
+![Equations](/images/simulator-screenshot.png)
+
+## Description
+This projects aims to implement a Model Predictive Control to drive a car around a track. An MPC is an advance method of process control, which allows the current timeslot to be optimized, while keeping future timeslots in account.
+
+The car runs along a track in a simulator, which provides a stream of values containing the position, speed and heading direction. The model must predict the control and adjust it to the expected trajectory.
+
+### The model
+
+The implementation relies on a simplified model of the real world, the bycicle kinematic model. This model abstracts the kinematic model of a real car as if it was a two wheels system, which the front wheel being the steering one. It also neglects dynamical effects such as inertia, troque or friction. In the image below can be seen the main variables involved in the model: 
+
+![Model image](/images/kinematic-bicycle-model.png)
+
+The model involves the following variables:
+* State: position (x, y), orientation angle (psi), velocity (v), cross-track error (cte) and psi error (epsi).
+* output: acceleration (a) and delta (steer). 
+
+Which are combined with the following equations to predict the state from previous input:
+
+![Equations](/images/mpc-equations.png)
+
+### Timestep Length and Elapsed Duration (N & dt)
+
+The prediction horizon is the duration over which future predictions are made. The product of N and dt is the prediction horizon, T.
+
+N is the number of timesteps in the horizon and dt is how much time elapses between actuations. For example, if N were 20 and dt were 0.5, then T would be 10 seconds. Short prediction horizons lead to more responsive controlers, but are less accurate and can suffer from instabilities when chosen too short. Long prediction horizons generally lead to smoother controls. Also, for a given T, shorter timesteps give as a result a more accurate control, but it increases the latency. 
+
+I chose the values doing try an error, and I chose a time horizon of 1 second with 0.1 timesteps, so N=10 and dt=0.1
+
+### Polynomial Fitting and MPC Preprocessing
+
+The waypoints are processed to convert them to the vehicle coordinate system. Shifting and rotation is done to align the x-axis with the heading direction. The code can be found in main.cpp:
+```
+          for (int i = 0; i < ptsx.size(); i++) {
+            double dx = ptsx[i] - px;
+            double dy = ptsy[i] - py;
+            waypoints_x.push_back(dx * cos(-psi) - dy * sin(-psi));
+            waypoints_y.push_back(dx * sin(-psi) + dy * cos(-psi));
+          }
+```
+### Model Predictive Control with Latency
+
+The model must handle a 100 millisecond latency, which in our case is also the timestamp interval (dt=100). In MPC, the actuation is done a timestamp later, so we need to modify the equation to take into account t-2 timesteps for the actuator variables:
+```
+      if (t > 1) {   // use previous actuations (to account for latency)
+        a = vars[a_start + t - 2];
+        delta = vars[delta_start + t - 2];
+      }
+
+```
+In the lessons a penalization in the cost function is suggested. However, to provide a better control in steering, an additional cost penalizing has been added combining velocity and delta:
+
+```
+    for (int i = 0; i < N - 1; i++) {
+      fg[0] += 1000*CppAD::pow(vars[delta_start + i] * vars[v_start+i], 2);
+      fg[0] += 3*CppAD::pow(vars[a_start + i], 2);
+      
+    }
+```
+
 ---
 
 ## Dependencies
