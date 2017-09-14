@@ -21,7 +21,7 @@ double dt = 0.1;
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
 
-double ref_v = 75;
+double ref_v = 70;
 
 size_t x_start = 0;
 size_t y_start = x_start + N;
@@ -33,7 +33,7 @@ size_t delta_start = epsi_start + N;
 size_t a_start = delta_start + N - 1;
 
 class FG_eval {
-public:
+  public:
   // Fitted polynomial coefficients
   Eigen::VectorXd coeffs;
   FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
@@ -52,20 +52,22 @@ public:
     // Reference State Cost
     for (int i = 0; i < N; i++) {
       // trajectory
-      fg[0] += CppAD::pow(vars[cte_start + i], 2);
-      fg[0] += CppAD::pow(vars[epsi_start + i], 2);
+      fg[0] += 2000 * CppAD::pow(vars[cte_start + i], 2);
+      fg[0] += 2000 * CppAD::pow(vars[epsi_start + i], 2);
       fg[0] += CppAD::pow(vars[v_start + i] - ref_v, 2);
     }
     
     // Minimize the use of actuators.
     for (int i = 0; i < N - 1; i++) {
-      fg[0] += CppAD::pow(vars[delta_start + i], 2);
-      fg[0] += 10*CppAD::pow(vars[a_start + i], 2);
+      fg[0] += 1000*CppAD::pow(vars[delta_start + i] * vars[v_start+i], 2);
+      //fg[0] += 3*CppAD::pow(vars[delta_start + i], 2);
+      fg[0] += 3*CppAD::pow(vars[a_start + i], 2);
+      
     }
     
     // Minimize the value gap between sequential actuations.
     for (int i = 0; i < N - 2; i++) {
-      fg[0] += 300*CppAD::pow(vars[delta_start + i + 1] - vars[delta_start + i], 2);
+      fg[0] += 150*CppAD::pow(vars[delta_start + i + 1] - vars[delta_start + i], 2);
       fg[0] += 10*CppAD::pow(vars[a_start + i + 1] - vars[a_start + i], 2);
     }
     
@@ -157,7 +159,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // SHOULD BE 0 besides initial state.
   Dvector vars(n_vars);
   for (int i = 0; i < n_vars; i++) {
-    vars[i] = 0.0;
+    vars[i] = 0;
   }
   // Set the initial variable values
   vars[x_start] = x;
@@ -240,9 +242,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   CppAD::ipopt::solve_result<Dvector> solution;
   
   // solve the problem
-  CppAD::ipopt::solve<Dvector, FG_eval>(
-                                        options, vars, vars_lowerbound, vars_upperbound, constraints_lowerbound,
-                                        constraints_upperbound, fg_eval, solution);
+  CppAD::ipopt::solve<Dvector, FG_eval>(options, vars, vars_lowerbound, vars_upperbound, constraints_lowerbound, constraints_upperbound, fg_eval, solution);
   
   // Check some of the solution values
   ok &= solution.status == CppAD::ipopt::solve_result<Dvector>::success;
